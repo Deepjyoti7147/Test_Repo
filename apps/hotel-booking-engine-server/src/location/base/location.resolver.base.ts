@@ -13,6 +13,12 @@ import * as graphql from "@nestjs/graphql";
 import { GraphQLError } from "graphql";
 import { isRecordNotFoundError } from "../../prisma.util";
 import { MetaQueryPayload } from "../../util/MetaQueryPayload";
+import * as nestAccessControl from "nest-access-control";
+import * as gqlACGuard from "../../auth/gqlAC.guard";
+import { GqlDefaultAuthGuard } from "../../auth/gqlDefaultAuth.guard";
+import * as common from "@nestjs/common";
+import { AclFilterResponseInterceptor } from "../../interceptors/aclFilterResponse.interceptor";
+import { AclValidateRequestInterceptor } from "../../interceptors/aclValidateRequest.interceptor";
 import { Location } from "./Location";
 import { LocationCountArgs } from "./LocationCountArgs";
 import { LocationFindManyArgs } from "./LocationFindManyArgs";
@@ -23,10 +29,20 @@ import { DeleteLocationArgs } from "./DeleteLocationArgs";
 import { HotelFindManyArgs } from "../../hotel/base/HotelFindManyArgs";
 import { Hotel } from "../../hotel/base/Hotel";
 import { LocationService } from "../location.service";
+@common.UseGuards(GqlDefaultAuthGuard, gqlACGuard.GqlACGuard)
 @graphql.Resolver(() => Location)
 export class LocationResolverBase {
-  constructor(protected readonly service: LocationService) {}
+  constructor(
+    protected readonly service: LocationService,
+    protected readonly rolesBuilder: nestAccessControl.RolesBuilder
+  ) {}
 
+  @graphql.Query(() => MetaQueryPayload)
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "read",
+    possession: "any",
+  })
   async _locationsMeta(
     @graphql.Args() args: LocationCountArgs
   ): Promise<MetaQueryPayload> {
@@ -36,14 +52,26 @@ export class LocationResolverBase {
     };
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => [Location])
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "read",
+    possession: "any",
+  })
   async locations(
     @graphql.Args() args: LocationFindManyArgs
   ): Promise<Location[]> {
     return this.service.locations(args);
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.Query(() => Location, { nullable: true })
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "read",
+    possession: "own",
+  })
   async location(
     @graphql.Args() args: LocationFindUniqueArgs
   ): Promise<Location | null> {
@@ -54,7 +82,13 @@ export class LocationResolverBase {
     return result;
   }
 
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @graphql.Mutation(() => Location)
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "create",
+    possession: "any",
+  })
   async createLocation(
     @graphql.Args() args: CreateLocationArgs
   ): Promise<Location> {
@@ -64,7 +98,13 @@ export class LocationResolverBase {
     });
   }
 
+  @common.UseInterceptors(AclValidateRequestInterceptor)
   @graphql.Mutation(() => Location)
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "update",
+    possession: "any",
+  })
   async updateLocation(
     @graphql.Args() args: UpdateLocationArgs
   ): Promise<Location | null> {
@@ -84,6 +124,11 @@ export class LocationResolverBase {
   }
 
   @graphql.Mutation(() => Location)
+  @nestAccessControl.UseRoles({
+    resource: "Location",
+    action: "delete",
+    possession: "any",
+  })
   async deleteLocation(
     @graphql.Args() args: DeleteLocationArgs
   ): Promise<Location | null> {
@@ -99,7 +144,13 @@ export class LocationResolverBase {
     }
   }
 
+  @common.UseInterceptors(AclFilterResponseInterceptor)
   @graphql.ResolveField(() => [Hotel], { name: "hotels" })
+  @nestAccessControl.UseRoles({
+    resource: "Hotel",
+    action: "read",
+    possession: "any",
+  })
   async findHotels(
     @graphql.Parent() parent: Location,
     @graphql.Args() args: HotelFindManyArgs
